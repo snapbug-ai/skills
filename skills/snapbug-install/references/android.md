@@ -1,6 +1,6 @@
 # Snapbug on Android (native app)
 
-Requirements: `minSdk` 23 or higher, a recent Kotlin Gradle plugin (2.3 or later is known to work), and an app module applying `com.android.application`.
+Requirements: `minSdk` 23 or higher, a recent Kotlin Gradle plugin (2.2 or later), and an app module applying `com.android.application`.
 
 Expect the debug APK to grow by tens of megabytes (the inspector transport and the overlay UI). The release APK is unaffected. Mention this to the user.
 
@@ -147,7 +147,7 @@ This only allows plain-text traffic to the local inspector. Everything else keep
 ./gradlew :app:assembleDebug :app:assembleRelease
 ```
 
-Replace `:app` with the real module path. Both must succeed. A `Duplicate class` error in release means a per-plugin Snapbug artifact was added: remove it and keep only the `snapbug` / `snapbug-no-op` pair. `incompatible Kotlin metadata version` (or a similar Kotlin version error) means the app's Kotlin is older than the SDK needs. Tell the user to upgrade the Kotlin Gradle plugin (2.3 or later is known to work) instead of downgrading Snapbug.
+Replace `:app` with the real module path. Both must succeed. A `Duplicate class` error in release means a per-plugin Snapbug artifact was added: remove it and keep only the `snapbug` / `snapbug-no-op` pair. `incompatible Kotlin metadata version` (or a similar Kotlin version error) means the app's Kotlin is older than the SDK needs. Tell the user to upgrade the Kotlin Gradle plugin (2.2 or later) instead of downgrading Snapbug.
 
 If release fails only on signing, `:app:compileReleaseKotlin` is enough to prove the no-op swap compiles.
 

@@ -1,6 +1,6 @@
 # Snapbug in a React Native app
 
-Requirements: React Native 0.73 or later, React 18 or later, Android `minSdk` 24 or higher, iOS 15 or later (Apple-silicon simulators only).
+Requirements: React Native 0.73 or later, React 18 or later, Android `minSdk` 24 or higher plus the toolchain floor below, iOS 15 or later (Apple-silicon simulators only).
 
 The package brings the native SDK with it. **Do not edit `MainActivity`, `MainApplication` or `AppDelegate`, and do not add `ai.snapbug:*` Gradle dependencies.** On Android, the module already wires the debug SDK and the release no-op twin.
 
@@ -18,9 +18,41 @@ npm install snapbug-react-native
 
 If `android/build.gradle` sets `minSdkVersion` below 24, raise it to 24 and tell the user.
 
+## Android toolchain floor
+
+The SDK's Android artifacts need a recent build toolchain. Older project templates (for example Flutter 3.24 and React Native 0.73) ship below it and fail to build until it is raised:
+
+| What | Minimum | Where |
+| --- | --- | --- |
+| `compileSdk` | 36 | `android/app/build.gradle(.kts)` |
+| Android Gradle plugin | 8.6.0 | `android/settings.gradle(.kts)` (`com.android.application`) or `android/build.gradle` |
+| Gradle wrapper | 8.7 | `android/gradle/wrapper/gradle-wrapper.properties` |
+| Kotlin Gradle plugin | 2.2 | `org.jetbrains.kotlin.android` next to AGP, or the `kotlinVersion` / `kotlin_version` property |
+
+Raise only what is below the minimum, and never lower anything. Typical errors when a floor is missed: `requires … compileSdk 36`, `requires Android Gradle plugin 8.6.0`, `incompatible version of Kotlin`. These upgrades touch the user's toolchain, so list each one explicitly in your final summary.
+
+## Workaround for SDK 0.1.1: missing network security config
+
+<!-- Maintainers: delete this section (and its twins in android.md and the other wrapper file) once
+     the published SDK is 0.1.2 or newer — the core AAR ships the resource from then on. -->
+
+The published SDK 0.1.1 points the app at `@xml/network_security_config` but does not ship that file. A debug build then fails with `resource xml/network_security_config ... not found`. Unless `android/app/src/main/AndroidManifest.xml` already sets its own `android:networkSecurityConfig`, create `android/app/src/debug/res/xml/network_security_config.xml` with exactly this content:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Needed by Snapbug SDK 0.1.1 in debug builds; delete after upgrading Snapbug. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>
+```
+
+
 ## 2. iOS release twin
 
-CocoaPods has no automatic debug/release swap. In `ios/Podfile`, inside the app target, add:
+CocoaPods has no automatic debug/release swap. In `ios/Podfile`, make sure the platform is at least iOS 15 (`platform :ios, '15.0'`, or `min_ios_version_supported` when it is 15 or higher). Then, inside the app target, add:
 
 ```ruby
 pod 'Snapbug',       '~> 0.1.1', :configurations => ['Debug']
