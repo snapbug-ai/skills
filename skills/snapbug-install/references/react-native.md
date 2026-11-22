@@ -16,6 +16,8 @@ Install with the project's package manager (look for `yarn.lock`, `pnpm-lock.yam
 npm install snapbug-react-native
 ```
 
+The package has its own version number, separate from the native SDK it brings, so a package version that differs from the pod versions below is expected. Let the package manager choose the version.
+
 If `android/build.gradle` sets `minSdkVersion` below 24, raise it to 24 and tell the user.
 
 ## Android toolchain floor
@@ -36,7 +38,7 @@ Raise only what is below the minimum, and never lower anything. Typical errors w
 <!-- Maintainers: delete this section (and its twins in android.md and the other wrapper file) once
      the published SDK is 0.1.2 or newer — the core AAR ships the resource from then on. -->
 
-The published SDK 0.1.1 points the app at `@xml/network_security_config` but does not ship that file. A debug build then fails with `resource xml/network_security_config ... not found`. Unless `android/app/src/main/AndroidManifest.xml` already sets its own `android:networkSecurityConfig`, create `android/app/src/debug/res/xml/network_security_config.xml` with exactly this content:
+Every `snapbug-react-native` release so far brings SDK 0.1.1. That SDK points the app at `@xml/network_security_config` but does not ship the file. A debug build then fails with `resource xml/network_security_config ... not found`. Unless `android/app/src/main/AndroidManifest.xml` already sets its own `android:networkSecurityConfig`, create `android/app/src/debug/res/xml/network_security_config.xml` with exactly this content:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -52,18 +54,20 @@ The published SDK 0.1.1 points the app at `@xml/network_security_config` but doe
 
 ## 2. iOS release twin
 
-CocoaPods has no automatic debug/release swap. In `ios/Podfile`, make sure the platform is at least iOS 15 (`platform :ios, '15.0'`, or `min_ios_version_supported` when it is 15 or higher). Then, inside the app target, add:
+CocoaPods has no automatic debug/release swap. In `ios/Podfile`, make sure the platform is at least iOS 15. Templates from React Native 0.76 on use `platform :ios, min_ios_version_supported`, which is already 15.1, so leave that line alone. Older templates need `platform :ios, '15.0'`. Then, inside the app target (for example right after `config = use_native_modules!`), add:
 
 ```ruby
 pod 'Snapbug',       '~> 0.1.1', :configurations => ['Debug']
 pod 'Snapbug-no-op', '~> 0.1.1', :configurations => ['Release']
 ```
 
-Then run `cd ios && pod install`.
+Then run `cd ios && bundle exec pod install` (or plain `pod install` if the project has no `Gemfile`). The first run also creates or updates Xcode project files. That is normal, and the user should commit them.
+
+Both pods provide a module named `Snapbug`, so the warning `'Snapbug' is missing a dependency on 'Snapbug-no-op'` is expected and harmless.
 
 ## 3. Start the SDK
 
-In the app's JS entry file (`index.js`, or the file that calls `AppRegistry.registerComponent`), before the registration:
+In the app's JS entry file (`index.js` or `index.ts`, the file named by `main` in `package.json`, which calls `AppRegistry.registerComponent`), before the registration:
 
 ```javascript
 import { Snapbug, patchFetch } from 'snapbug-react-native';
@@ -72,7 +76,7 @@ patchFetch();      // captures every fetch() call
 Snapbug.start();
 ```
 
-`patchFetch()` must run before any module makes a request. Keep it at the top of the entry file, after the imports. Only `fetch` is patched. axios uses `XMLHttpRequest` by default, so unless the app sets `adapter: 'fetch'`, tell the user that axios calls will not appear in the network tab.
+`patchFetch()` must run before any module makes a request. Keep it at the top of the entry file, after the imports. Only `fetch` is patched. axios uses `XMLHttpRequest` by default, so unless the app sets `adapter: 'fetch'`, tell the user that axios calls will not appear in the network tab. If the app does not use axios, say nothing about it.
 
 In TypeScript entry files the same code applies unchanged.
 
@@ -80,7 +84,9 @@ In TypeScript entry files the same code applies unchanged.
 
 ```bash
 cd android && ./gradlew assembleDebug assembleRelease && cd ..
-cd ios && xcodebuild -workspace *.xcworkspace -scheme <AppScheme> -configuration Debug -destination 'generic/platform=iOS Simulator' build   # macOS with Xcode only
+cd ios && xcodebuild -workspace <App>.xcworkspace -scheme <App> -configuration Debug -sdk iphonesimulator ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build   # macOS with Xcode only
 ```
 
-Also run the project's typecheck or lint script if one exists (`npm run tsc`, `npm run lint`).
+Use the app's real workspace and scheme names (`xcodebuild -list`, not the `Pods-…` scheme).
+
+Then run `npm run lint` if that script exists. In a TypeScript project, also run `npx tsc --noEmit`.

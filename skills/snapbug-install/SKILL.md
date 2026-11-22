@@ -9,7 +9,7 @@ Snapbug streams an app's network calls, logs, crashes, database and analytics in
 
 ## Rules that are easy to get wrong
 
-1. **Debug only.** The live SDK goes into debug builds. Release builds get the **no-op twin**, which has the same API and does nothing. Never leave the live SDK in a release or App Store build. Never guard the call site with `BuildConfig.DEBUG` either: the swap happens at the dependency level.
+1. **Debug only.** The live SDK goes into debug builds. Release builds get the **no-op twin**, which has the same API and does nothing. Never leave the live SDK in a release or App Store build. A release build still contains a few small `io.snapbug` classes (the no-op API and annotation helpers): that is expected, and only WebRTC or a 30 MB iOS framework in release means a leak. Never guard the call site with `BuildConfig.DEBUG` either: the swap happens at the dependency level.
 2. **One artifact.** On Android, `ai.snapbug:snapbug` is all-in-one. It already includes the OkHttp, Ktor, gRPC and Room integrations. Do not add per-plugin artifacts (`snapbug-okhttp-interceptor`, `snapbug-analytics`, …). In release they land next to their no-op twins and the build fails with `Duplicate class`.
 3. **Android start takes an `Activity`.** `Snapbug.start(this)` goes in the launcher `Activity.onCreate()`, never in `Application.onCreate()`, because the overlay needs an Activity. Repeated calls (rotation, re-creation) are safe.
 4. **One line.** All plugins are on by default. Do not add plugin configuration the user did not ask for.
@@ -52,7 +52,7 @@ Run the build command from the reference: a debug build plus a release build, wh
 Summarize the files you changed, then give these steps:
 
 1. Install a Snapbug inspector: the desktop app from https://snapbug.ai/download, or the CLI with `brew install snapbug-ai/tap/snapbug && snapbug serve`.
-2. Run the debug build on a device or emulator. A floating Snapbug bubble appears. On Android it asks for the "display over other apps" permission the first time.
+2. Run the debug build on a device or emulator. A floating Snapbug bubble appears. Some Android versions first ask for the "display over other apps" permission.
 3. Open the bubble's menu and connect: enter the 6-digit code shown in the inspector, or scan its QR code.
 4. To file a bug report, open the bubble's menu (shaking the device opens it too).
 
