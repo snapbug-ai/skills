@@ -17,9 +17,11 @@ pod 'Snapbug',       '~> 0.1.1', :configurations => ['Debug']
 pod 'Snapbug-no-op', '~> 0.1.1', :configurations => ['Release']
 ```
 
-Both lines are required. With only the first one, the Release configuration has no `Snapbug` module and fails to compile. If the project has extra configurations (for example `Staging`), add each one to the matching list.
+Both lines are required. With only the first one, the Release configuration has no `Snapbug` module and fails to compile. If the project has extra configurations (for example `Staging`), put a configuration in the live list only if internal testers install builds made from it. Anything that can reach the App Store goes in the no-op list. If you are unsure, ask the user.
 
-Then run `pod install` and keep using the `.xcworkspace`.
+Keep the target's existing `use_frameworks!` setting. Then run `pod install` (it needs network access to CocoaPods trunk) and keep using the `.xcworkspace`.
+
+Both pods provide a module named `Snapbug`, and CocoaPods builds both in every configuration. Warnings like `Multiple targets match implicit dependency for linker flags '-framework Snapbug'` and `'Snapbug-no-op' is missing a dependency on 'Snapbug'` are therefore expected and harmless. Do not try to fix them.
 
 ## Swift Package Manager
 
@@ -29,40 +31,52 @@ SPM has no per-configuration dependencies, so guard the call site yourself: wrap
 
 ## Start the SDK
 
-SwiftUI: in the `@main` App struct's `init()`.
+The published SDK 0.1.1 attaches the floating bubble only if a window scene already exists when `Snapbug.start()` runs. Started from `App.init()` or `didFinishLaunching`, the SDK runs, but the bubble never appears and the user cannot connect. Start once the first screen is on screen:
+
+<!-- Maintainers: once the published SDK is 0.1.2 or newer (it waits for the scene itself),
+     this can go back to a plain Snapbug.start() in App.init() / didFinishLaunching. -->
+
+SwiftUI: from the root view's `.onAppear`, with a run-once guard. This is verified on the simulator with 0.1.1.
 
 ```swift
 import Snapbug
+import SwiftUI
 
 @main
 struct MyApp: App {
-    init() {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .onAppear { SnapbugBootstrap.startOnce() }
+        }
+    }
+}
+
+@MainActor
+enum SnapbugBootstrap {
+    private static var started = false
+    static func startOnce() {
+        guard !started else { return }
+        started = true
         Snapbug.start()
     }
-
-    var body: some Scene {
-        WindowGroup { ContentView() }
-    }
 }
 ```
 
-UIKit: in `application(_:didFinishLaunchingWithOptions:)` of the `AppDelegate`, before `return true`.
+If the root view already has an `.onAppear`, add the call inside it rather than chaining a second one.
 
-```swift
-import Snapbug
-
-func application(_ application: UIApplication,
-                 didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-    Snapbug.start()
-    return true
-}
-```
+UIKit with a `SceneDelegate`: at the end of `scene(_:willConnectTo:options:)`, after the window is made key and visible, using the same run-once guard. UIKit without scenes (only an `AppDelegate` with a `window`): at the end of `application(_:didFinishLaunchingWithOptions:)`, after `window?.makeKeyAndVisible()`, before `return true`.
 
 With CocoaPods, do not wrap the call in `#if DEBUG`: the Release build links the no-op pod, and the call does nothing there.
 
 ## Info.plist keys (required)
 
-Add these two keys to the app's Info.plist, unless they are already present. iOS kills the app outright when it touches the camera or the microphone without a usage string, and that looks like a crash in the SDK.
+Add these two keys to the app's Info.plist, unless they are already present. Where the keys go:
+
+- If the target has `GENERATE_INFOPLIST_FILE = YES` and no Info.plist file of its own, add them as build settings `INFOPLIST_KEY_NSMicrophoneUsageDescription` and `INFOPLIST_KEY_NSCameraUsageDescription`.
+- With XcodeGen or Tuist, add them to the manifest (XcodeGen: `info.properties` in `project.yml`). Otherwise the next generate erases them.
+
+ iOS kills the app outright when it touches the camera or the microphone without a usage string, and that looks like a crash in the SDK.
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
@@ -75,16 +89,20 @@ If the app already has one of these keys, keep its existing text.
 
 ## Network capture
 
-Swift `URLSession` traffic is not captured automatically. Only a Kotlin Multiplatform Ktor client can be hooked: `install(SnapbugKtorPlugin)`, with `import io.snapbug.sdk.ktor.SnapbugKtorPlugin`. For a pure Swift app, skip network capture and tell the user so.
+Swift `URLSession` traffic is not captured automatically. Only a Kotlin Multiplatform Ktor client can be hooked: `install(SnapbugKtorPlugin)`, with `import io.snapbug.sdk.ktor.SnapbugKtorPlugin`. For a pure Swift app, skip network capture, and say in your final summary that network requests will not appear in the inspector.
 
 ## Verify
 
 ```bash
-xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' build
-xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS Simulator' build
+xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build
+xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphonesimulator ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build
 ```
 
-Use `-project App.xcodeproj` instead of `-workspace` for SPM projects without a workspace. Use the real scheme name (`xcodebuild -list`). Without Xcode in this environment, say that the build was not verified.
+`ARCHS=arm64` is needed because the framework has no Intel simulator slice.
+
+A green Release build does not prove the swap on its own, because both pods are compiled. Also check the built Release app: `Snapbug.framework` inside `<App>.app/Frameworks/` should be about 7 MB (no-op). About 31 MB means the live SDK leaked into Release.
+
+Use `-project App.xcodeproj` instead of `-workspace` for SPM projects without a workspace. Use the app's real scheme name from `xcodebuild -list`, not the `Pods-…` one. Without Xcode in this environment, say that the build was not verified.
 
 ## Kotlin Multiplatform path (Compose Multiplatform apps)
 
