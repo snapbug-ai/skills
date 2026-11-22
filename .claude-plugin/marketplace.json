@@ -1,0 +1,19 @@
+{
+  "name": "snapbug",
+  "owner": {
+    "name": "Snapbug",
+    "url": "https://snapbug.ai"
+  },
+  "metadata": {
+    "description": "Agent skills for Snapbug — the debugging and bug-reporting SDK for mobile apps."
+  },
+  "plugins": [
+    {
+      "name": "snapbug",
+      "description": "Install the Snapbug SDK into an Android, iOS, Flutter or React Native app without writing the integration by hand.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/snapbug-install"]
+    }
+  ]
+}
