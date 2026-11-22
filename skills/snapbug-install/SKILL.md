@@ -33,7 +33,11 @@ Look at the repository root (and `android/` and `ios/` for cross-platform apps):
 
 Flutter and React Native wrap the native SDK. Use only their reference: do not also apply the Android or iOS reference to the same app.
 
-If the repository holds several apps, ask the user which one to set up. If nothing matches, say that Snapbug supports Android, iOS, Flutter and React Native, and stop.
+If the repository holds several apps, ask the user which one to set up.
+
+If it is a web app (a `package.json` without `react-native` or `expo`, or a plain website), no SDK is installed. Snapbug inspects web pages through the Snapbug Chrome extension. It is not in the Chrome Web Store yet, so point the user to https://snapbug.ai/docs/chrome-extension, change nothing in the project, and stop.
+
+If nothing matches, say that Snapbug supports Android, iOS, Flutter and React Native apps, and web pages through the Chrome extension, and stop.
 
 ### 2. Read the reference and apply it
 
